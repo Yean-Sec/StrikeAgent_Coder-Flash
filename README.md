@@ -20,6 +20,26 @@
 
 ![StrikeAgent_Coder-Flash 架构](docs/assets/architecture.png)
 
+## 产品页面展示
+
+审计列表：全部项目的进度、漏洞计数与耗时。
+
+![审计列表](docs/assets/ScreenShot_2026-09-14_213300_325.png)
+
+项目详情：代码审计与靶机验证流水线、分环节续跑。
+
+![项目详情](docs/assets/ScreenShot_2026-09-14_213338_727.png)
+
+单个漏洞详情：评级、问题描述与污点链。
+
+![漏洞详情](docs/assets/ScreenShot_2026-09-14_213920_710.png)
+
+## 交付报告
+
+*此报告为一次真实的授权审计场景*
+
+![安全审计报告](docs/assets/ScreenShot_2026-09-14_210619_629.png)
+
 ## 环境与安装说明
 
 
@@ -29,7 +49,7 @@
 把下面整段连同源代码交给任意能跑本机命令的 AI。它应按原文把控制台搭起来，不要把路径写死成别人的机器。
 
 ```
-你要在本机把 StrikeAgent_Coder-Flash 从当前源代码部署到可打开的代码审计控制台。目标系统是 Kali / Debian 系 Linux（有 Node、能装全局 npm 包、能跑 Docker）。不要用 Docker 当本控制台的主路径（控制台是 Node 前后端；Docker 只给「远程验证」拉靶机用）。不要把任何路径写死成某台机器上的绝对目录。
+你要在本机把 StrikeAgent_Coder-Flash 从当前源代码部署到可打开的代码审计控制台。目标系统是 Kali / Debian 系 Linux（有 Node、能装全局 npm 包、能跑 Docker）。不要用 Docker 当本控制台的主路径（控制台是 Node 前后端；Docker 只给「远程验证」拉靶机用）。不要把任何路径写死成 /home/kali/桌面/... 或其它克隆者机器上的目录。
 
 一、目录与进程纪律
 - 仓库根记为 REPO（含 backend/、frontend/、docs/、根 package.json 的 npm workspaces）。
