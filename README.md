@@ -1,12 +1,14 @@
+<p align="center">
+  <img src="docs/assets/header-icon.png" width="128" height="128" alt="StrikeAgent" />
+  <img src="docs/assets/times.svg" width="48" height="128" alt="×" />
+  <img src="docs/assets/header-brand.png" width="128" height="128" alt="夜安团队 SEC" />
+</p>
 
+<p align="center">
+  <sub>StrikeAgent × 夜安团队 SEC</sub>
+</p>
 
-![StrikeAgent_Coder-Flash](docs/assets/header-icon.png)![×](docs/assets/times.svg)![夜安团队 SEC](docs/assets/header-brand.png)
-
-StrikeAgent × 夜安团队 SEC
-
-
-
-# StrikeAgent_Coder-Flash
+<h1 align="center">StrikeAgent_Coder-Flash</h1>
 
 ![StrikeAgent_Coder-Flash 架构](docs/assets/main.gif)
 
