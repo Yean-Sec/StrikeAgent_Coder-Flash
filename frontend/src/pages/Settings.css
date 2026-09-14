@@ -1,0 +1,162 @@
+.settings-page {
+  max-width: 820px;
+}
+.setting-card {
+  margin-bottom: 18px;
+}
+.setting-card h3 {
+  font-size: 18px;
+  margin-bottom: 6px;
+}
+.setting-card > p.muted {
+  font-size: 13px;
+  margin: 0 0 14px;
+  line-height: 1.6;
+}
+.setting-card code {
+  background: var(--surface-card);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--primary);
+  margin: 0 2px;
+}
+.link-reset {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  padding: 8px 0 0;
+}
+.link-reset:hover {
+  text-decoration: underline;
+}
+
+.setting-row {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.setting-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 220px;
+  margin-bottom: 14px;
+}
+.setting-field label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--ink);
+}
+.field-hint {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.stage2-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 6px;
+}
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+  cursor: pointer;
+  flex: none;
+}
+.toggle input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+.textarea:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 审计流程选项 */
+.flow-options {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.flow-option {
+  flex: 1;
+  min-width: 240px;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.flow-option:hover {
+  border-color: var(--primary);
+}
+.flow-option.active {
+  border-color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+.flow-option input {
+  margin-top: 2px;
+  accent-color: var(--primary);
+}
+.flow-option div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.flow-option strong {
+  font-size: 14px;
+}
+
+.toggle-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+.toggle-row:hover {
+  border-color: var(--primary);
+}
+.toggle-row input {
+  margin-top: 2px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+  flex: none;
+}
+.toggle-row div {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.toggle-row strong {
+  font-size: 14px;
+}
+
+.settings-foot {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 8px;
+}
+.saved-msg {
+  color: var(--success);
+  font-size: 14px;
+}

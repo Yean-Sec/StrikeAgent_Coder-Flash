@@ -1,0 +1,410 @@
+.vulns-page {
+  width: 100%;
+}
+
+.vulns-page .back-link {
+  margin-bottom: 20px;
+}
+.vulns-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+  flex-wrap: wrap;
+}
+.sev-filter {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.sev-filter .sfilter {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--hairline);
+  border-radius: 999px;
+  background: var(--surface-card);
+  color: var(--muted);
+  font-size: 13px;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.sev-filter .sfilter:hover {
+  color: var(--ink);
+  border-color: var(--primary);
+}
+.sev-filter .sfilter.active {
+  color: #fff;
+  background: var(--primary);
+  border-color: var(--primary);
+}
+.sev-filter .sfilter.sev-critical.active {
+  background: var(--sev-critical);
+  border-color: var(--sev-critical);
+}
+.sev-filter .sfilter.sev-high.active {
+  background: var(--sev-high);
+  border-color: var(--sev-high);
+}
+.sev-filter .sfilter.sev-medium.active {
+  background: var(--sev-medium);
+  border-color: var(--sev-medium);
+}
+.sev-filter .sfilter.sev-low.active {
+  background: var(--sev-low);
+  border-color: var(--sev-low);
+}
+.sev-filter .sfilter.sev-info.active {
+  background: var(--sev-info);
+  border-color: var(--sev-info);
+}
+.sfilter-count {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, currentColor 16%, transparent);
+}
+.sev-filter .sfilter.verified-filter.active {
+  background: var(--sev-low);
+  border-color: var(--sev-low);
+}
+
+.active-filters {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 12px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 500;
+}
+.filter-chip button {
+  border: none;
+  background: color-mix(in srgb, var(--ink) 10%, transparent);
+  color: var(--muted);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.filter-chip button:hover {
+  background: var(--primary);
+  color: #fff;
+}
+.verified-tag {
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  color: var(--sev-low);
+  background: color-mix(in srgb, var(--sev-low) 16%, transparent);
+  vertical-align: middle;
+}
+.frontend-rce-tag {
+  color: var(--primary);
+  background: color-mix(in srgb, var(--primary) 14%, transparent);
+}
+
+/* 红队实战二次评级标记 */
+.rtv-pill {
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 1px 8px;
+  border-radius: 999px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.rtv-高 {
+  color: var(--sev-critical);
+  background: color-mix(in srgb, var(--sev-critical) 14%, transparent);
+}
+.rtv-中 {
+  color: var(--sev-high);
+  background: color-mix(in srgb, var(--sev-high) 14%, transparent);
+}
+.rtv-低 {
+  color: var(--sev-medium);
+  background: color-mix(in srgb, var(--sev-medium) 16%, transparent);
+}
+.rtv-无 {
+  color: var(--sev-info);
+  background: color-mix(in srgb, var(--sev-info) 16%, transparent);
+}
+.rtv-down {
+  color: var(--muted);
+  background: color-mix(in srgb, var(--muted) 14%, transparent);
+  text-decoration: line-through;
+}
+.sev-original {
+  font-size: 12px;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+.regrade-block {
+  border-left: 3px solid var(--primary);
+  padding-left: 12px;
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+  border-radius: 0 8px 8px 0;
+}
+.regrade-block h4 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.regrade-change {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary);
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+
+.vuln-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.vuln-table th {
+  text-align: left;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hairline);
+}
+.vuln-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--hairline);
+  font-size: 13px;
+  vertical-align: middle;
+}
+.vuln-tr {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.vuln-tr:hover {
+  background: color-mix(in srgb, var(--primary) 5%, transparent);
+}
+
+/* 前台 RCE 视图：项目分组行——折叠态汇总一个项目下的多个 RCE，点击展开 */
+.group-tr {
+  background: color-mix(in srgb, var(--primary) 4%, transparent);
+  font-weight: 500;
+}
+.group-tr:hover {
+  background: color-mix(in srgb, var(--primary) 9%, transparent);
+}
+.group-tr.expanded {
+  background: color-mix(in srgb, var(--primary) 7%, transparent);
+  border-bottom: none;
+}
+.group-tr.expanded td {
+  border-bottom: none;
+}
+.group-toggle-icon {
+  display: inline-block;
+  width: 14px;
+  color: var(--primary);
+  font-size: 11px;
+}
+/* 展开后的明细行：轻微缩进 + 更淡背景，标识从属于上方项目分组 */
+.vuln-tr-nested {
+  background: color-mix(in srgb, var(--surface-soft) 60%, transparent);
+}
+.vuln-tr-nested:hover {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+.vuln-tr-nested .vt-title {
+  padding-left: 28px;
+}
+.col-sev {
+  width: 84px;
+}
+.vt-title {
+  font-weight: 500;
+  color: var(--ink);
+  max-width: 360px;
+}
+.vt-proj {
+  background: none;
+  border: none;
+  color: var(--primary);
+  font-size: 13px;
+  cursor: pointer;
+  padding: 0;
+}
+.vt-proj:hover {
+  text-decoration: underline;
+}
+.vt-loc {
+  max-width: 240px;
+  font-size: 12px;
+}
+.col-rce-time {
+  width: 132px;
+  white-space: nowrap;
+}
+.vt-rce-time {
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.vuln-table .empty-row {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px;
+}
+
+/* 服务端分页控件 */
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 8px 4px;
+  flex-wrap: wrap;
+}
+.pager-info {
+  font-size: 13px;
+  color: var(--muted);
+}
+.pager-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.pager-cur {
+  font-size: 13px;
+  color: var(--body);
+  min-width: 56px;
+  text-align: center;
+}
+.pager-btn {
+  border: 1px solid var(--hairline);
+  background: var(--canvas);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.pager-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.pager-btn:not(:disabled):hover {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+/* 漏洞详情弹窗（样式此前只在项目详情页，列表页点击无视觉反馈） */
+.vulns-page .modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 20, 19, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 24px;
+  animation: vulnsFadeIn 0.15s;
+}
+@keyframes vulnsFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+.vulns-page .modal {
+  background: var(--canvas);
+  border-radius: var(--radius-xl);
+  max-width: 720px;
+  width: 100%;
+  max-height: 86vh;
+  overflow-y: auto;
+  padding: 28px;
+  animation: vulnsSlideUp 0.2s;
+}
+@keyframes vulnsSlideUp {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.vulns-page .modal-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.vulns-page .modal-head h2 {
+  font-size: 22px;
+  flex: 1;
+}
+.vulns-page .modal-close {
+  background: none;
+  border: none;
+  color: var(--muted);
+  font-size: 18px;
+  cursor: pointer;
+}
+.vulns-page .modal-meta {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 13px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--hairline);
+}
+.vulns-page .modal-meta strong {
+  color: var(--ink);
+}
+.vulns-page .modal-block {
+  margin-top: 18px;
+}
+.vulns-page .modal-block h4 {
+  font-size: 13px;
+  color: var(--primary);
+  margin: 0 0 8px;
+  font-family: var(--sans);
+}
+.vulns-page .modal-block p {
+  margin: 0;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+.vulns-page .code-block {
+  background: var(--surface-dark);
+  color: #e6e0d8;
+  padding: 16px;
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+}

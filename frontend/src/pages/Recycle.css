@@ -1,0 +1,222 @@
+.recycle-page {
+  padding: 32px 40px;
+  max-width: 1200px;
+}
+
+.recycle-page .page-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 20px;
+}
+.recycle-page .page-head h1 {
+  font-size: 30px;
+}
+.recycle-page .page-head p {
+  color: var(--muted);
+  margin: 6px 0 0;
+}
+
+.recycle-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.recycle-search {
+  width: 220px;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  font-size: 13px;
+  outline: none;
+}
+.recycle-search:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(204, 120, 92, 0.15);
+}
+
+.recycle-count {
+  color: var(--muted);
+  font-size: 13px;
+  margin-bottom: 10px;
+}
+
+.recycle-empty {
+  padding: 60px 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.recycle-table-wrap {
+  background: #fff;
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+.recycle-table-head,
+.recycle-table-row {
+  display: grid;
+  grid-template-columns:
+    minmax(150px, 1.2fr)
+    minmax(210px, 2fr)
+    110px
+    80px
+    minmax(170px, 1.35fr)
+    150px;
+  align-items: center;
+  min-width: 940px;
+  font-size: 13px;
+}
+.recycle-table-head {
+  padding-right: 10px;
+  background: var(--surface-soft);
+  border-bottom: 1px solid var(--hairline);
+}
+.recycle-table-head > span {
+  text-align: left;
+  padding: 12px 16px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.recycle-table-body {
+  max-height: min(560px, 62vh);
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+.recycle-table-virtual {
+  position: relative;
+  min-width: 940px;
+}
+.recycle-table-row {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  min-height: 50px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--hairline-soft);
+}
+.recycle-table-row > [role='cell'] {
+  padding: 12px 16px;
+  min-width: 0;
+}
+.recycle-table-row:hover {
+  background: var(--surface-soft);
+}
+
+.rc-name {
+  font-weight: 600;
+  color: var(--ink);
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-source {
+  max-width: 360px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rc-source a {
+  color: var(--primary);
+}
+.rc-archive {
+  color: var(--body);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+.rc-num {
+  font-variant-numeric: tabular-nums;
+}
+.rc-time {
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.rc-web {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rc-web-1 {
+  background: rgba(93, 184, 166, 0.15);
+  color: #3f8f80;
+}
+.rc-web-0 {
+  background: rgba(142, 139, 130, 0.15);
+  color: var(--muted);
+}
+.rc-web-null {
+  background: rgba(212, 160, 23, 0.15);
+  color: #a97e10;
+}
+
+.rc-reason {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 600;
+}
+.rc-reason-manual {
+  background: rgba(142, 139, 130, 0.15);
+  color: var(--muted);
+}
+.rc-reason-bulk {
+  background: rgba(204, 120, 92, 0.14);
+  color: var(--primary-active);
+}
+.rc-reason-auto_non_web {
+  background: rgba(198, 69, 69, 0.12);
+  color: var(--error);
+}
+.rc-detail {
+  color: var(--muted-soft);
+  font-size: 12px;
+}
+.rc-reason-cell {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recycle-pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--hairline);
+  color: var(--muted);
+  font-size: 13px;
+}
+.recycle-pager-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.recycle-pager .btn {
+  padding: 6px 12px;
+  min-height: 34px;
+}
+
+@media (max-width: 900px) {
+  .recycle-page {
+    padding: 24px;
+  }
+  .recycle-page .page-head,
+  .recycle-head-actions {
+    flex-wrap: wrap;
+  }
+  .recycle-table-wrap {
+    overflow-x: auto;
+  }
+}

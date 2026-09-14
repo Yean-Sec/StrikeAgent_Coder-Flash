@@ -1,0 +1,418 @@
+.agent-flow {
+  background: linear-gradient(160deg, #1c1b18 0%, #161512 60%, #1a1916 100%);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-lg);
+  padding: 20px 20px 16px;
+  position: relative;
+  overflow: hidden;
+}
+.agent-flow::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 15% 0%, rgba(204, 120, 92, 0.14), transparent 45%),
+    radial-gradient(circle at 85% 100%, rgba(93, 184, 166, 0.1), transparent 45%);
+  pointer-events: none;
+}
+
+/* 顶部步骤 + 进度条 */
+.flow-header {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.flow-step {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: none;
+}
+.step-badge {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--serif);
+  font-size: 17px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary);
+  box-shadow: 0 0 14px rgba(204, 120, 92, 0.5);
+}
+.step-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.3;
+}
+.step-caption {
+  font-size: 11px;
+  color: var(--on-dark-soft);
+  letter-spacing: 0.5px;
+}
+.step-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--on-dark);
+}
+.flow-progress {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  overflow: hidden;
+}
+.flow-progress-bar {
+  height: 100%;
+  border-radius: 9999px;
+  background: linear-gradient(90deg, var(--accent-teal), var(--primary));
+  box-shadow: 0 0 12px rgba(204, 120, 92, 0.5);
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* 画布 */
+.flow-canvas-scroll {
+  position: relative;
+  z-index: 1;
+  overflow-x: auto;
+  padding: 6px 0 10px;
+}
+.flow-canvas {
+  position: relative;
+  margin: 0 auto;
+  min-width: 100%;
+}
+.flow-edges {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.flow-lane-tag {
+  position: absolute;
+  left: 8px;
+  width: 78px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.6px;
+  color: var(--on-dark-soft);
+  line-height: 1.3;
+  z-index: 2;
+}
+.flow-edge {
+  fill: none;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.edge-bridge {
+  stroke-width: 1.6;
+}
+/* 已完成：细虚线缓慢流动，贴近官网 Enable 线 */
+.edge-done {
+  stroke: var(--accent-teal);
+  stroke-dasharray: 6 6;
+  opacity: 0.88;
+  animation: flowDash 1.4s linear infinite;
+}
+/* 待执行：极淡虚线，无流动 */
+.edge-pending {
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-dasharray: 3 5;
+  opacity: 0.45;
+}
+/* 进行中：珊瑚橙虚线，与官网 flow-line 同拍 */
+.edge-flowing {
+  stroke: var(--primary);
+  stroke-dasharray: 6 6;
+  animation: flowDash 0.9s linear infinite;
+}
+/* 跨行长廊更长，虚线位移放慢，避免「进度」飞过去 */
+.edge-bridge.edge-flowing {
+  animation-duration: 3.8s;
+}
+.edge-bridge.edge-done {
+  animation-duration: 5.2s;
+}
+@keyframes flowDash {
+  to {
+    stroke-dashoffset: -24px;
+  }
+}
+.edge-pulse {
+  fill: var(--primary);
+}
+.edge-pulse-done {
+  fill: var(--accent-teal);
+}
+.edge-pulse-flowing {
+  fill: var(--primary);
+}
+.edge-pulse-pending {
+  fill: transparent;
+}
+.edge-endpoint {
+  stroke: none;
+}
+.edge-endpoint-done {
+  fill: var(--accent-teal);
+}
+.edge-endpoint-flowing {
+  fill: var(--primary);
+}
+.edge-endpoint-pending {
+  fill: rgba(255, 255, 255, 0.28);
+}
+.edge-chip {
+  fill: #1c1b18;
+  stroke: var(--accent-teal);
+  stroke-width: 1;
+}
+.edge-chip-flowing {
+  stroke: var(--primary);
+}
+.edge-chip-pending {
+  stroke: rgba(255, 255, 255, 0.22);
+}
+.edge-label {
+  font-size: 11px;
+  fill: var(--accent-teal);
+  text-anchor: middle;
+  font-family: var(--sans);
+}
+.edge-label-flowing {
+  fill: var(--primary);
+}
+.edge-label-pending {
+  fill: var(--on-dark-soft);
+}
+@media (prefers-reduced-motion: reduce) {
+  .edge-done,
+  .edge-flowing {
+    animation: none;
+  }
+}
+
+/* 节点 */
+.gnode {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  background: var(--surface-dark-elevated);
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-md);
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+  z-index: 1;
+}
+.gnode-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  flex: none;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--on-dark-soft);
+}
+.gnode-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.3;
+}
+.gnode-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--on-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.gnode-status {
+  font-size: 10.5px;
+  color: var(--on-dark-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 已完成 */
+.status-done {
+  border-color: rgba(93, 184, 166, 0.45);
+}
+.status-done .gnode-icon {
+  background: rgba(93, 184, 166, 0.18);
+  color: var(--accent-teal);
+}
+.status-done .gnode-status {
+  color: var(--accent-teal);
+}
+
+.status-skipped {
+  opacity: 0.55;
+  border-style: dashed;
+  border-color: rgba(160, 157, 150, 0.45);
+}
+.status-skipped .gnode-icon {
+  background: rgba(160, 157, 150, 0.16);
+  color: var(--on-dark-soft);
+}
+.status-skipped .gnode-status {
+  color: var(--on-dark-soft);
+}
+
+/* 待执行 */
+.status-pending {
+  opacity: 0.45;
+  border-style: dashed;
+}
+
+/* 进行中：克制的呼吸光晕（不用旋转环，避免俗套） */
+.status-active {
+  border-color: var(--primary);
+  background: var(--surface-dark-soft);
+  z-index: 2;
+  animation: activeBreath 2.1s ease-in-out infinite;
+}
+@keyframes activeBreath {
+  0%,
+  100% {
+    box-shadow: 0 0 0 1px rgba(204, 120, 92, 0.4), 0 4px 16px rgba(204, 120, 92, 0.18);
+  }
+  50% {
+    box-shadow: 0 0 0 1px rgba(204, 120, 92, 0.85), 0 8px 28px rgba(204, 120, 92, 0.4);
+  }
+}
+.status-active .gnode-icon {
+  background: var(--primary);
+  color: #fff;
+  animation: iconPulse 1.4s ease-in-out infinite;
+}
+.status-active .gnode-status {
+  color: #f0b89f;
+}
+@keyframes iconPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(204, 120, 92, 0.55);
+  }
+  60% {
+    box-shadow: 0 0 0 6px rgba(204, 120, 92, 0);
+  }
+}
+
+.kind-result.status-done {
+  border-color: rgba(93, 184, 114, 0.6);
+}
+.kind-result.status-done .gnode-icon {
+  background: var(--success);
+  color: #fff;
+}
+
+/* 底部状态栏 */
+.flow-status {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+  padding: 10px 14px;
+  background: rgba(0, 0, 0, 0.28);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-md);
+  color: var(--on-dark);
+  font-size: 13px;
+  font-family: var(--mono);
+}
+.flow-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted-soft);
+  flex: none;
+}
+.flow-led.on {
+  background: var(--accent-teal);
+  animation: ledBlink 1.2s infinite;
+}
+@keyframes ledBlink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.3;
+  }
+}
+.flow-status-text {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 分环节运行控制条 */
+.stage-runner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.08);
+}
+.stage-runner-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.stage-runner-sep {
+  width: 1px;
+  align-self: stretch;
+  min-height: 22px;
+  background: rgba(255, 255, 255, 0.12);
+  margin: 0 4px;
+}
+.stage-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+  padding: 4px 8px;
+}
+.stage-chip-name {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.78);
+}
+.stage-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(204, 120, 92, 0.4);
+  background: rgba(204, 120, 92, 0.12);
+  color: var(--primary, #cc785c);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.stage-btn:hover {
+  background: rgba(204, 120, 92, 0.24);
+}
+.stage-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: rgba(160, 157, 150, 0.35);
+  color: var(--on-dark-soft);
+  background: transparent;
+}

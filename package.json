@@ -1,0 +1,27 @@
+{
+  "name": "code",
+  "version": "1.0.0",
+  "private": true,
+  "license": "AGPL-3.0-only",
+  "description": "基于本地 Pi 的图形化代码审计工具",
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--disable-warning=DEP0169\" concurrently -n backend,frontend -c magenta,cyan \"npm:dev:backend\" \"npm:dev:frontend\"",
+    "dev:nowatch": "NODE_OPTIONS=\"${NODE_OPTIONS:+$NODE_OPTIONS }--disable-warning=DEP0169\" concurrently -n backend,frontend -c magenta,cyan \"npm:start:backend\" \"npm:dev:frontend\"",
+    "dev:backend": "npm --workspace backend run dev",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "start:backend": "npm --workspace backend run start",
+    "build": "npm --workspace frontend run build",
+    "start": "npm --workspace backend run start",
+    "start:web": "npm run build && npm --workspace backend run start",
+    "install:all": "npm install",
+    "postinstall": "npm rebuild better-sqlite3 --workspace=backend || true",
+    "setup:linguist": "gem install charlock_holmes --no-document && gem install rugged --no-document -- --use-system-libraries && gem install github-linguist --no-document"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
+}

@@ -1,0 +1,84 @@
+.monitor-toast {
+  background: var(--success);
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: var(--radius-md);
+  margin-bottom: 16px;
+  font-size: 14px;
+}
+.monitor-form {
+  margin-bottom: 22px;
+}
+.form-grid {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.form-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.form-field label {
+  font-size: 12px;
+  color: var(--muted);
+}
+.form-field.grow {
+  flex: 1;
+  min-width: 240px;
+}
+.form-field.small {
+  width: 140px;
+}
+.add-btn {
+  flex: none;
+}
+
+.monitor-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.monitor-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.monitor-item.off {
+  opacity: 0.6;
+}
+.monitor-repo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.monitor-repo strong {
+  color: var(--ink);
+  word-break: break-all;
+}
+.mon-led {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--muted-soft);
+  flex: none;
+}
+.mon-led.on {
+  background: var(--success);
+  animation: ledBlink 1.6s infinite;
+}
+.monitor-meta {
+  display: flex;
+  gap: 20px;
+  flex-wrap: wrap;
+  color: var(--muted);
+  font-size: 12px;
+}
+.monitor-actions {
+  display: flex;
+  gap: 8px;
+  flex: none;
+}

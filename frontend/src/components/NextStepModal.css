@@ -1,0 +1,38 @@
+.nextstep-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(24, 23, 21, 0.45);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+}
+.nextstep-modal {
+  width: 440px;
+  max-width: calc(100vw - 48px);
+  background: var(--surface-card);
+  border-radius: 16px;
+  padding: 26px 26px 20px;
+  box-shadow: 0 24px 60px rgba(24, 23, 21, 0.28);
+}
+.nextstep-modal h3 {
+  font-size: 18px;
+  margin: 0 0 8px;
+}
+.nextstep-sub {
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0 0 18px;
+  line-height: 1.6;
+}
+.nextstep-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 4px;
+}
+.nextstep-actions .btn {
+  width: 100%;
+  justify-content: center;
+}

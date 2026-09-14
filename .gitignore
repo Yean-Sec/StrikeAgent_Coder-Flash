@@ -1,0 +1,40 @@
+# 依赖与构建产物
+node_modules/
+dist/
+build/
+.codegraph/
+frontend/tsconfig.tsbuildinfo
+
+# 运行时数据：SQLite、审计结果、克隆的目标项目、上传文件
+backend/data/
+backend/workspace/
+backend/uploads/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# 审计活动导出、去重结果、探测输出（含目标清单与漏洞数据）
+exports/
+_ai_dedup/
+POC/
+backend/scripts/*.json
+backend/scripts/_probe_astron_rce_safe.*
+backend/scripts/_tmp_*
+backend/_watch_status_tmp.ps1
+chat_xss.png
+
+# 密钥与本机环境
+.env
+.env.*
+*.pem
+*.key
+!.github/**
+
+# 编辑器 / 日志
+.cursor/
+.claude/
+.DS_Store
+*.local
+*.log
