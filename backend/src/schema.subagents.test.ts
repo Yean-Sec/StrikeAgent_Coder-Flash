@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { AUDIT_LANGUAGES, SUBAGENTS_BY_LANG, buildAuditOrchestratorPrompt, subagentMission, subagentsForLanguage } from './schema';
+import { AUDIT_LANGUAGES, SUBAGENTS_BY_LANG, buildAuditOrchestratorPrompt, buildSpecialtyAgentPrompt, subagentMission, subagentsForLanguage } from './schema';
 import { AUDIT_PIPE } from './runner';
 
 function missionsOf(lang: keyof typeof SUBAGENTS_BY_LANG): string {
@@ -105,8 +105,25 @@ test('audit orchestrator prompt assigns every specialty lane and forbids self-au
   assert.match(prompt, /主控调度/);
   assert.match(prompt, /禁止自己逐文件挖洞/);
   assert.match(prompt, /不要再调用 Task\/Agent 重复派发/);
+  assert.match(prompt, /禁止 sleep/);
+  assert.match(prompt, /立即结束本会话/);
+  assert.match(prompt, /禁止轮询/);
+  assert.doesNotMatch(prompt, /每 30 秒/);
+  assert.doesNotMatch(prompt, /ls\/Read 检查一次/);
   for (const type of agents) {
     assert.ok(prompt.includes(type), `missing lane ${type}`);
     assert.ok(prompt.includes(`JSON/${type}.json`), `missing output ${type}.json`);
+  }
+});
+
+test('specialty prompts for every language stay inside the source tree and never sleep-wait', () => {
+  for (const lang of AUDIT_LANGUAGES) {
+    for (const type of subagentsForLanguage(lang)) {
+      const prompt = buildSpecialtyAgentPrompt('/repo/src', type);
+      assert.match(prompt, /检索边界/);
+      assert.match(prompt, /禁止 `find \/`/);
+      assert.match(prompt, /禁止 `sleep`/);
+      assert.ok(prompt.includes('/repo/src'));
+    }
   }
 });

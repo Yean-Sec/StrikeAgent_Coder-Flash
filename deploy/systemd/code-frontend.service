@@ -1,0 +1,31 @@
+[Unit]
+Description=StrikeAgent_Coder-Flash Vite frontend (LAN :5302)
+After=network-online.target code-flash-backend.service
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=20
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__
+Environment=NODE_ENV=development
+Environment=HOME=__HOME__
+Environment=BIND_HOST=0.0.0.0
+Environment=FRONTEND_PORT=5302
+Environment=BACKEND_PORT=8787
+Environment=PORT=8787
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+ExecStartPre=/bin/mkdir -p __REPO__/backend/data/logs
+ExecStart=__NPM__ run dev:frontend
+Restart=always
+RestartSec=2
+TimeoutStopSec=20
+KillMode=mixed
+KillSignal=SIGTERM
+
+StandardOutput=append:__REPO__/backend/data/logs/frontend.log
+StandardError=append:__REPO__/backend/data/logs/frontend.err.log
+SyslogIdentifier=code-frontend
+
+[Install]
+WantedBy=multi-user.target

@@ -131,7 +131,7 @@ function classifyFromLatestCoverageLog(project: Project): AuditCoverageVerdict {
 export function classifyAuditCoverageProject(project: Project): AuditCoverageVerdict {
   const workspace = resolveWorkspace(project);
   if (!workspace) return classifyFromLatestCoverageLog(project);
-  const coverage = auditCoverageSnapshot(workspace, { repair: false });
+  const coverage = auditCoverageSnapshot(workspace, { repair: false, projectId: project.id });
   if (coverage.status === 'unknown_language') {
     return {
       project_id: project.id,

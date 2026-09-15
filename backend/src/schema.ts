@@ -530,6 +530,8 @@ ${langLine}
   - \`description\` 本身也要内嵌这条逐跳链与绕过推演，标题用「具体入口/边界 —— 根因」范式。
 - **需要串联多个独立漏洞的跨语言利用链**（A漏洞+B漏洞[+C漏洞]才达成 RCE/接管）：**不要**作为单漏洞入库，而是写入 \`${dir}/JSON/cross_language_chain_candidates.json\`（严格合法 JSON 数组），每条含：\`name\`(链名)、\`impact\`(危害)、\`languages\`(涉及语言数组)、\`steps\`(每步：语言/漏洞点/文件:行/所需前置)、\`rationale\`(为何能串通)。这份仅作为**候选线索**交给后续靶机组合验证阶段实测，本阶段不做靶机验证。
 
+${workspaceSearchRules(dir)}
+
 # 硬性要求
 1. **只报跨语言相关的发现**：纯单语言问题留给对应子智能体，不在此重复。
 2. 至少完整走一遍第一步的边界枚举，即使某类边界不存在也要确认过（在终端简述）。
@@ -540,9 +542,17 @@ ${langLine}
 完成落盘后，按指定 JSON Schema 输出本轮**跨语言单漏洞**发现的汇总（只含上面第①类单漏洞，第②类候选链不放进 vulnerabilities）。所有文本用简体中文。`;
 }
 
+/** 所有语言审计共用：检索不得离开源码树，也不得 sleep 空等其它路。 */
+export function workspaceSearchRules(dir: string): string {
+  return `# 检索边界（所有语言强制）
+- 只在 \`${dir}\` 内检索与读文件。Grep / Glob / Read / find 的路径必须是相对本目录，或绝对路径位于本目录下。
+- 禁止 \`find /\`、\`find /home\`、\`find /usr\`、\`grep\` 以 \`/\` 为起点、\`os.walk('/')\`、\`Path('/')\`、locate、在家目录或系统目录扫文件。
+- 第三方库实现只在本目录的 vendor / node_modules / composer / target 等依赖树里找；找不到就按「仓库内未见实现」结论文，不要全盘找。
+- 禁止 \`sleep\` / 轮询 JSON / 等待其它子智能体落盘。其它路数由后端并发拉起并收口，本会话不得空等。`;
+}
+
 /**
- * 多智能体审计主控：只分配 4 路方向并收口，自己不挖洞。
- * 与 4 路专项 Pi 同时拉起，合计 5 个进程。
+ * 兼容保留：默认不再 spawn 主控 Pi。若仍启动，只确认分配并立即结束，禁止轮询。
  */
 export function buildAuditOrchestratorPrompt(dir: string, language: string, agents: string[]): string {
   const lang = AUDIT_LANGUAGE_LABELS[language] || language;
@@ -550,21 +560,21 @@ export function buildAuditOrchestratorPrompt(dir: string, language: string, agen
   const lanes = agents
     .map((t, i) => `${i + 1}. \`${t}\`：${subagentMission(t)} → 必须写入 \`${dir}/JSON/${t}.json\``)
     .join('\n');
-  return `你是代码审计【主控调度】。本会话只负责把 **${lang}** 的审计方向分配给 ${n} 路专项子智能体，并在它们落盘后汇总。禁止自己逐文件挖洞。
+  return `你是代码审计【主控调度】。本会话只确认把 **${lang}** 的审计方向分给 ${n} 路专项。禁止自己逐文件挖洞。
 
-# 分配方案（必须按此 ${n} 路并发，不得增删、不得合并、不得改名）
+# 分配方案（必须按此 ${n} 路，不得增删、不得合并、不得改名）
 ${lanes}
 
 # 执行
-1. 立即确认上述 ${n} 路方向已分配完毕。后端已为每一路拉起独立 Pi，**不要再调用 Task/Agent 重复派发**（重复派发会多开进程、浪费配额）。
-2. 轮询 \`${dir}/JSON/<类型>.json\`：${n} 个文件都存在且是合法 JSON（空数组 \`[]\` 也算该路完成）才进入汇总。大约每 30 秒用 ls/Read 检查一次，保持有输出。
-3. 某路迟迟未落盘时，在终端标明缺哪一路，**不要自己顶上那一路去扫源码**。
-4. ${n} 路齐了之后，读取各 JSON，按 JSON Schema 输出合并汇总。不要去重、不要代码级验证、不要定级校准、不要搭靶机、不要输出组合利用链。
+1. 用一两句话确认上述 ${n} 路已由后端各自拉起独立 Pi。**不要再调用 Task/Agent 重复派发**。
+2. 确认后立即结束本会话。不要汇总、不要读 JSON。
+3. ${n} 路是否落盘、何时收口，全部由后端等待，与你无关。
+
+${workspaceSearchRules(dir)}
 
 # 硬性
-- 你是分配与收口，不是第 ${n + 1} 路挖洞员。
-- title/category/description/recommendation/taint_chain 用简体中文。
-- vulnerabilities 是高召回原始清单，宁多勿漏。`;
+- 禁止 sleep、禁止轮询 \`${dir}/JSON/\`、禁止 ls/Read 检查落盘、禁止自己顶上任何一路扫源码。
+- 你是分配确认，不是第 ${n + 1} 路挖洞员，也不是收口进程。`;
 }
 
 /**
@@ -580,6 +590,8 @@ export function buildSpecialtyAgentPrompt(dir: string, agentType: string): strin
 # 产物
 源码目录 ${dir} 只读。禁止改源码、禁止使用 MCP。
 结果必须写入 \`${jsonPath}\`：顶层数组，或含 findings/vulnerabilities/issues 的对象。0 发现也要写合法空数组 \`[]\`。
+
+${workspaceSearchRules(dir)}
 
 # 硬性要求
 - 只负责这一类；逐端点 × 逐 Sink × 逐触发条件成条，严禁合并抽样。
@@ -603,6 +615,8 @@ export function buildSubagentRerunPrompt(
   return `此前审计中，下列专项尚未落盘有效 JSON。请按清单亲自完成静态发现并写入指定文件。禁止 MCP。0 发现也要写空数组。不要去重或代码级验证。
 
 ${list}
+
+${workspaceSearchRules(dir)}
 
 全部落盘后按 JSON Schema 汇总本次补跑发现。`;
 }
@@ -636,7 +650,8 @@ ${list}
 2. **标注了「可达高危·必判」的成员优先且必须判**（可达 RCE / 注入生效 / 任意文件读写 / 鉴权或授权绕过 / 越权拿他人数据 / 脱库 / SSRF 打内网 / 反序列化执行）：确认有缺陷的**每一个都单独成条**（含逐跳 \`taint_chain\`，标注“文件:行/函数”），追加写入你的 \`JSON/${agentType}.json\`。
 3. 回到 \`JSON/${agentType}.enum.json\`，给这些成员逐个回填 \`verdict\`：有缺陷标 \`defect\`（并已成条），确认安全标 \`safe\` 并给一句代码级理由（参数化 / 已转义 / 输入不可控 / 路径不可达等，指出文件:行）。
 4. 判定默认取向：**找不到"确实生效的防御代码(文件:行)"就应判 defect 成条**，不要因为"看起来没问题""上层可能已处理"就标 safe。
-5. 最后按 JSON Schema 输出本次补判新增发现的汇总（简体中文）。`;
+5. 最后按 JSON Schema 输出本次补判新增发现的汇总（简体中文）。
+${workspaceSearchRules(dir)}`;
 }
 
 /** AI 红队实战二次评级输出 schema。 */
@@ -1259,6 +1274,8 @@ export function buildPrompt(corePrompt: string, dir: string, language = 'php', r
 # 本会话范围
 后端会为下列 ${n} 路专项各自拉起独立进程。若你被指派其中一路，只处理自己那一类并写入对应 \`JSON/<类型>.json\`：
 ${missions}
+
+${workspaceSearchRules(dir)}
 
 # 硬性要求
 - 只负责自己那一类；逐端点 × 逐 Sink × 逐触发条件成条，严禁合并抽样。

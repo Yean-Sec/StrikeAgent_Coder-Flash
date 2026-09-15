@@ -17,6 +17,8 @@
     "build": "npm --workspace frontend run build",
     "start": "npm --workspace backend run start",
     "start:web": "npm run build && npm --workspace backend run start",
+    "up": "bash scripts/code-up.sh",
+    "daemon": "bash scripts/code-daemon.sh",
     "install:all": "npm install",
     "postinstall": "npm rebuild better-sqlite3 --workspace=backend || true",
     "setup:linguist": "gem install charlock_holmes --no-document && gem install rugged --no-document -- --use-system-libraries && gem install github-linguist --no-document"

@@ -1,0 +1,36 @@
+[Unit]
+Description=StrikeAgent_Coder-Flash API backend (supervisor :8787)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=60
+StartLimitBurst=20
+
+[Service]
+Type=simple
+WorkingDirectory=__REPO__/backend
+Environment=NODE_ENV=production
+Environment=HOME=__HOME__
+Environment=BIND_HOST=0.0.0.0
+Environment=PORT=8787
+Environment=BACKEND_MAX_OLD_SPACE_MB=4096
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+EnvironmentFile=-__REPO__/backend/data/code-agent.env
+ExecStartPre=/bin/mkdir -p __REPO__/backend/data/logs
+ExecStart=__NODE__ --disable-warning=DEP0169 supervisor.mjs
+Restart=always
+RestartSec=2
+TimeoutStopSec=40
+KillMode=mixed
+KillSignal=SIGTERM
+
+StandardOutput=append:__REPO__/backend/data/logs/backend.log
+StandardError=append:__REPO__/backend/data/logs/backend.err.log
+SyslogIdentifier=code-backend
+
+MemoryMax=8G
+MemoryHigh=6G
+TasksMax=8192
+LimitNOFILE=1048576
+
+[Install]
+WantedBy=multi-user.target

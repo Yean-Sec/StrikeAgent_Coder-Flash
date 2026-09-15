@@ -1,14 +1,14 @@
-// 零依赖后端守护进程：拉起后端子进程，崩溃/被杀后按退避自动重启，
-// 并把每次退出的 code/signal/uptime/时间滚动记入 data/supervisor.log。
+// 零依赖后端守护：拉起后端子进程；崩溃、被杀、卡死（/api/health 无响应）后在约 0.5–6s 内拉起。
+// 滚动日志：data/supervisor.log。PID：data/supervisor.pid、data/backend.pid。
 //
-// 背景：后端进程会因大库下的 V8 堆溢出（heap out of memory，退出码 134）或被 OS
-// OOM-killer 杀（SIGKILL）而直接消失，且 process.on('uncaughtException') 抓不住这两类；
-// 后端此前挂在前台终端裸跑、无任何 supervisor，一崩就永久停摆。此守护负责恢复与取证。
+// 背景：后端会因 V8 OOM（退出码 134）、OS OOM-killer（SIGKILL）、未捕获异常、或启动对账堵死
+// 事件循环而停摆。前台 npm run dev / tsx watch 关终端即整组退出，且 tsx watch 改源码会掐断审计。
+// 此守护负责恢复；systemd Restart=always 再兜一层（守护自身挂了也会被拉起）。
 //
-// 用法：node backend/supervisor.mjs（见根 package.json 的 start / start:backend / start:web）。
+// 用法：node backend/supervisor.mjs（npm start / scripts/code-up.sh）。
 // 环境变量：
 //   BACKEND_MAX_OLD_SPACE_MB  子进程 V8 老生代堆上限（MB），默认 4096。
-//   PORT / BIND_HOST          透传给后端；用于 EADDRINUSE 探活判定。
+//   PORT / BIND_HOST          透传给后端；探活时 0.0.0.0 改打 127.0.0.1。
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -21,24 +21,55 @@ const require = createRequire(import.meta.url);
 const backendDir = path.dirname(fileURLToPath(import.meta.url));
 const dataDir = path.join(backendDir, 'data');
 const logFile = path.join(dataDir, 'supervisor.log');
+const supervisorPidFile = path.join(dataDir, 'supervisor.pid');
+const backendPidFile = path.join(dataDir, 'backend.pid');
 
 const PORT = Number(process.env.PORT || 8787);
-const HOST = process.env.BIND_HOST || '127.0.0.1';
+const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
+const PROBE_HOST =
+  !BIND_HOST || BIND_HOST === '0.0.0.0' || BIND_HOST === '::' || BIND_HOST === '::0'
+    ? '127.0.0.1'
+    : BIND_HOST;
 const maxOldSpaceMb = Number(process.env.BACKEND_MAX_OLD_SPACE_MB || 4096);
 
-// 退避：初始 1s，指数翻倍，封顶 30s；子进程健康存活 ≥60s 视为正常运行，退避重置。
-const BACKOFF_MIN_MS = 1_000;
-const BACKOFF_MAX_MS = 30_000;
+const BACKOFF_MIN_MS = 500;
+const BACKOFF_MAX_MS = 6_000;
 const HEALTHY_UPTIME_MS = 60_000;
+const HEALTH_INTERVAL_MS = 2_000;
+const HEALTH_TIMEOUT_MS = 1_500;
+const HEALTH_FAILS = 3;
+const HEALTH_GRACE_MS = 8_000;
 const LOG_MAX_LINES = 2_000;
 
 let backoffMs = BACKOFF_MIN_MS;
 let child = null;
 let shuttingDown = false;
 let restartTimer = null;
+let healthTimer = null;
+let healthFails = 0;
+let childStartedAt = 0;
+let healthOkSince = 0;
+let mode = 'idle'; // idle | child | standby
 
 function ts() {
   return new Date().toISOString();
+}
+
+function writePid(file, pid) {
+  try {
+    fs.mkdirSync(dataDir, { recursive: true });
+    fs.writeFileSync(file, `${pid}\n`);
+  } catch {
+    /* ignore */
+  }
+}
+
+function clearPid(file) {
+  try {
+    fs.unlinkSync(file);
+  } catch {
+    /* ignore */
+  }
 }
 
 function appendLog(line) {
@@ -46,7 +77,6 @@ function appendLog(line) {
   try {
     fs.mkdirSync(dataDir, { recursive: true });
     fs.appendFileSync(logFile, entry);
-    // 滚动截断：超过上限行数时只保留最近 LOG_MAX_LINES 行，避免无限增长。
     const stat = fs.statSync(logFile);
     if (stat.size > 512 * 1024) {
       const lines = fs.readFileSync(logFile, 'utf8').split('\n');
@@ -60,11 +90,10 @@ function appendLog(line) {
   process.stdout.write(`[supervisor] ${line}\n`);
 }
 
-// 探活：EADDRINUSE 快速退出后，确认端口上是否已有健康后端在跑。
-function probeHealth(timeoutMs = 2_000) {
+function probeHealth(timeoutMs = HEALTH_TIMEOUT_MS) {
   return new Promise((resolve) => {
     const req = http.get(
-      { host: HOST, port: PORT, path: '/api/health', timeout: timeoutMs },
+      { host: PROBE_HOST, port: PORT, path: '/api/health', timeout: timeoutMs },
       (res) => {
         res.resume();
         resolve(res.statusCode === 200);
@@ -79,9 +108,6 @@ function probeHealth(timeoutMs = 2_000) {
 }
 
 function resolveEntry() {
-  // 单进程直起：node --import tsx src/index.ts，服务器就是本子进程本身，
-  // 这样能精准拿到它的退出 code/signal（区分 V8 OOM=134 与 OS OOM-kill=SIGKILL）。
-  // 校验 tsx 可解析，缺失则显式报错而非静默失败。
   require.resolve('tsx');
   return {
     cmd: process.execPath,
@@ -99,29 +125,103 @@ function buildEnv() {
   return { ...process.env, NODE_OPTIONS: existing.join(' ') };
 }
 
-function scheduleRestart() {
-  if (shuttingDown) return;
-  appendLog(`将在 ${Math.round(backoffMs / 1000)}s 后重启后端…`);
-  // 关键：不要 unref——子进程已退出时，这个定时器是唯一让事件循环存活的句柄，
-  // unref 会让守护在重启前就自行退出（曾导致「记完 SIGKILL 后守护也没了」）。
-  restartTimer = setTimeout(start, backoffMs);
-  backoffMs = Math.min(backoffMs * 2, BACKOFF_MAX_MS);
+function stopHealthWatch() {
+  if (healthTimer) {
+    clearInterval(healthTimer);
+    healthTimer = null;
+  }
+  healthFails = 0;
 }
 
-function start() {
-  restartTimer = null;
+function startChildHealthWatch() {
+  stopHealthWatch();
+  healthOkSince = 0;
+  healthTimer = setInterval(() => {
+    void tickChildHealth();
+  }, HEALTH_INTERVAL_MS);
+}
+
+async function tickChildHealth() {
+  if (shuttingDown || mode !== 'child' || !child) return;
+  if (Date.now() - childStartedAt < HEALTH_GRACE_MS) return;
+  const ok = await probeHealth();
+  if (ok) {
+    healthFails = 0;
+    if (!healthOkSince) healthOkSince = Date.now();
+    if (Date.now() - healthOkSince >= HEALTHY_UPTIME_MS) backoffMs = BACKOFF_MIN_MS;
+    return;
+  }
+  healthFails += 1;
+  healthOkSince = 0;
+  appendLog(
+    `健康检查失败 ${healthFails}/${HEALTH_FAILS}（${PROBE_HOST}:${PORT}/api/health 无 200）`
+  );
+  if (healthFails < HEALTH_FAILS) return;
+  healthFails = 0;
+  backoffMs = BACKOFF_MIN_MS;
+  appendLog('连续探活失败，判定后端卡死，SIGKILL 后立即拉起');
+  try {
+    if (child && child.pid) child.kill('SIGKILL');
+  } catch {
+    /* 子进程已退出 */
+  }
+}
+
+function enterStandby() {
+  mode = 'standby';
+  child = null;
+  clearPid(backendPidFile);
+  stopHealthWatch();
+  appendLog(`待命：${PROBE_HOST}:${PORT} 已有健康后端，不重复拉起；它挂了再接管`);
+  healthTimer = setInterval(() => {
+    void tickStandby();
+  }, HEALTH_INTERVAL_MS);
+}
+
+async function tickStandby() {
+  if (shuttingDown || mode !== 'standby') return;
+  const ok = await probeHealth();
+  if (ok) {
+    healthFails = 0;
+    return;
+  }
+  healthFails += 1;
+  appendLog(`待命探活失败 ${healthFails}/${HEALTH_FAILS}，准备接管`);
+  if (healthFails < HEALTH_FAILS) return;
+  healthFails = 0;
+  stopHealthWatch();
+  appendLog('原后端已无响应，开始接管拉起');
+  start();
+}
+
+function scheduleRestart() {
+  if (shuttingDown) return;
+  appendLog(`将在 ${Math.round(backoffMs)}ms 后重启后端…`);
+  restartTimer = setTimeout(start, backoffMs);
+  backoffMs = Math.min(Math.max(backoffMs * 2, BACKOFF_MIN_MS), BACKOFF_MAX_MS);
+}
+
+function spawnBackend() {
   const { cmd, args } = resolveEntry();
   const startedAt = Date.now();
+  childStartedAt = startedAt;
+  mode = 'child';
   child = spawn(cmd, args, { cwd: backendDir, env: buildEnv(), stdio: 'inherit' });
+  if (child.pid) writePid(backendPidFile, child.pid);
+  startChildHealthWatch();
 
   child.on('exit', (code, signal) => {
     const uptimeMs = Date.now() - startedAt;
+    const wasChild = mode === 'child';
     child = null;
+    clearPid(backendPidFile);
+    stopHealthWatch();
+    if (mode === 'child') mode = 'idle';
     const upSec = (uptimeMs / 1000).toFixed(1);
     appendLog(
       `后端子进程退出：code=${code ?? 'null'} signal=${signal ?? 'null'} uptime=${upSec}s` +
         (signal === 'SIGKILL'
-          ? '（疑似被 OS OOM-killer 杀）'
+          ? '（SIGKILL：可能是探活判定卡死、systemd 停机或 OS OOM-killer）'
           : code === 134 || code === 137
             ? '（疑似 V8 堆溢出 heap out of memory）'
             : '')
@@ -131,30 +231,23 @@ function start() {
       process.exit(0);
       return;
     }
+    if (!wasChild) return;
 
-    // 快速退出：可能是端口被占用（已有后端实例）。注意 index.ts 的 EADDRINUSE 会被其
-    // 全局 uncaughtException 兜底吞掉、最终以 code=0 退出，故这里不看退出码，一律探活：
-    // 端口上若已有健康后端在应答，说明是重复实例 → 守护退出（不重复拉起，避免多实例抢占）；
-    // 端口已空说明是真崩溃 → 正常走退避重启。
     if (uptimeMs < 5_000) {
       void probeHealth().then((alive) => {
-        if (alive) {
-          appendLog(`检测到 ${HOST}:${PORT} 已有健康后端在运行，守护退出（不重复拉起）。`);
-          process.exit(0);
-        } else {
-          scheduleRestart();
-        }
+        if (alive) enterStandby();
+        else scheduleRestart();
       });
       return;
     }
 
-    // 健康存活过阈值 → 视为正常运行后的偶发崩溃，退避重置为最小值。
     if (uptimeMs >= HEALTHY_UPTIME_MS) backoffMs = BACKOFF_MIN_MS;
     scheduleRestart();
   });
 
   child.on('error', (err) => {
     appendLog(`拉起后端失败：${err?.message || err}`);
+    clearPid(backendPidFile);
     if (!shuttingDown) scheduleRestart();
   });
 
@@ -163,30 +256,47 @@ function start() {
   );
 }
 
+function start() {
+  restartTimer = null;
+  if (shuttingDown) return;
+  if (child) return;
+  void probeHealth().then((alive) => {
+    if (shuttingDown) return;
+    if (alive) {
+      enterStandby();
+      return;
+    }
+    spawnBackend();
+  });
+}
+
 function shutdown(sig) {
   if (shuttingDown) return;
   shuttingDown = true;
+  mode = 'idle';
   appendLog(`收到 ${sig}，正在停止后端…`);
   if (restartTimer) {
     clearTimeout(restartTimer);
     restartTimer = null;
   }
+  stopHealthWatch();
   if (child) {
     child.kill(sig);
-    // 兜底：宽限期后仍未退出则强杀，避免留下孤儿。
     const force = setTimeout(() => {
       if (child) child.kill('SIGKILL');
+      clearPid(backendPidFile);
+      clearPid(supervisorPidFile);
       process.exit(0);
     }, 10_000);
     if (typeof force.unref === 'function') force.unref();
   } else {
+    clearPid(supervisorPidFile);
     process.exit(0);
   }
 }
 
 process.on('SIGINT', () => shutdown('SIGINT'));
 process.on('SIGTERM', () => shutdown('SIGTERM'));
-// 兜底：守护自身因任何可捕获原因退出时，同步带走子进程，杜绝孤儿后端继续占端口。
 process.on('exit', () => {
   if (child && child.pid) {
     try {
@@ -195,7 +305,10 @@ process.on('exit', () => {
       /* 子进程已退出 */
     }
   }
+  clearPid(backendPidFile);
+  clearPid(supervisorPidFile);
 });
 
-appendLog('后端守护启动。');
+writePid(supervisorPidFile, process.pid);
+appendLog(`后端守护启动（探活 ${PROBE_HOST}:${PORT}/api/health，失败 ${HEALTH_FAILS} 次后拉起）。`);
 start();

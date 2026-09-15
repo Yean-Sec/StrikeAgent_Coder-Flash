@@ -43,9 +43,11 @@ import { backfillExistingLogsToSqlite } from './logRetention';
 const PORT = Number(process.env.PORT || 8787);
 const BIND_HOST = process.env.BIND_HOST || '127.0.0.1';
 
-// 全局兜底：避免长时间重型审计中偶发的未捕获异常/拒绝直接杀死服务进程
+// 未捕获异常后进程状态不确定，继续活着只会变成「占着端口但不响应」。
+// 交给 supervisor / systemd 在数秒内拉起；unhandledRejection 仍只记日志，避免单次 Promise 打掉整台审计。
 process.on('uncaughtException', (err) => {
   console.error('[uncaughtException]', err);
+  process.exit(1);
 });
 process.on('unhandledRejection', (reason) => {
   console.error('[unhandledRejection]', reason);
@@ -431,12 +433,12 @@ function recoverOrphans(): void {
 }
 
 const app = express();
+// 探活必须挂在所有中间件之前：supervisor 每 2s 打这里，连续失败会 SIGKILL 本进程。
+app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now(), pid: process.pid }));
 app.use(cors());
 app.use(compression({ threshold: 1024 }));
 app.use(express.json({ limit: '10mb' }));
 app.use('/api', routes);
-
-app.get('/api/health', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
 // 生产托管：存在 frontend/dist 时由后端同端口提供 SPA（npm run start:web）
 const frontendDist = path.join(__dirname, '..', '..', 'frontend', 'dist');

@@ -25,7 +25,7 @@ import {
   isAuditCompletedForResume,
   isAuditCoverageFailureMessage,
 } from './runner';
-
+import { WORKSPACE_DIR } from './ingest';
 function tempWorkspace(withGo = true): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'audit-coverage-'));
   if (withGo) fs.writeFileSync(path.join(dir, 'go.mod'), 'module example.test/audit\n\ngo 1.23\n');
@@ -43,14 +43,41 @@ function writeExpected(dir: string, skip?: string): string[] {
   return initial.expected;
 }
 
-test('coverage is fail-closed when source language cannot be determined', () => {
-  const dir = tempWorkspace(false);
+test('nested GitHub workspace still uses project audit_language for coverage', () => {
+  const projectId = `p_covnest_${Date.now().toString(16)}`;
+  const outer = path.join(WORKSPACE_DIR, projectId);
+  const nested = path.join(outer, 'SomeRepo-Name');
+  fs.mkdirSync(path.join(nested, 'JSON'), { recursive: true });
+  // 根目录没有语言标志文件——旧逻辑会因 basename=SomeRepo-Name 查不到项目而 unknown_language
+  fs.writeFileSync(path.join(nested, 'README.md'), '# demo\n', 'utf8');
+  fs.mkdirSync(path.join(nested, 'backend'), { recursive: true });
+  fs.writeFileSync(path.join(nested, 'backend', 'pyproject.toml'), '[project]\nname="demo"\n', 'utf8');
+
+  db.prepare(
+    `INSERT INTO projects (
+       id, project_name, archive_name, source_type, source_ref, workspace_path,
+       status, audit_language, created_at
+     ) VALUES (?, ?, ?, 'github', ?, ?, 'running', 'python', ?)`
+  ).run(projectId, 'SomeRepo-Name', 'SomeRepo-Name', 'https://example.com/x', nested, Date.now());
+
   try {
-    const coverage = auditCoverageSnapshot(dir, { repair: false });
-    assert.equal(coverage.status, 'unknown_language');
-    assert.match(auditCoverageFailureReason(coverage) || '', /无法确定源码语言面/);
+    for (const agent of [
+      'python-rce-security-guard',
+      'python-sql-injection-guard',
+      'python-file-security-auditor',
+      'python-auth-audit-expert',
+    ]) {
+      fs.writeFileSync(path.join(nested, 'JSON', `${agent}.json`), '[]', 'utf8');
+    }
+    const byPath = auditCoverageSnapshot(nested, { repair: false });
+    assert.equal(byPath.status, 'complete', 'path under workspace/<id>/repo must resolve language');
+    assert.ok(byPath.expected.includes('python-rce-security-guard'));
+
+    const byHint = auditCoverageSnapshot(nested, { repair: false, projectId });
+    assert.equal(byHint.status, 'complete');
   } finally {
-    fs.rmSync(dir, { recursive: true, force: true });
+    db.prepare('DELETE FROM projects WHERE id = ?').run(projectId);
+    fs.rmSync(outer, { recursive: true, force: true });
   }
 });
 

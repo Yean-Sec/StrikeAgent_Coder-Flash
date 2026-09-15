@@ -49,6 +49,7 @@ import {
 import { deleteProjectRows } from './projectsService';
 import { fetchLatestRelease, localGitVersion } from './githubMeta';
 import { piSpawnEnv, buildAgentCliArgs, cleanupPromptFile } from './piResolver';
+import { auditGuardSpawnEnv, AUDIT_GUARD_CHANNELS } from './auditPathGuard';
 import { parseJsonArtifact, readJsonArtifactText } from './textEncoding';
 import { pruneRunLogsAsync, checkpointAndReclaim } from './runLogRetention';
 import {
@@ -1387,6 +1388,9 @@ function runPiStage(
     runLog.append('prompt', fullPrompt);
 
     const spawnEnvExtra: Record<string, string> = {};
+    if (AUDIT_GUARD_CHANNELS.has(channel)) {
+      Object.assign(spawnEnvExtra, auditGuardSpawnEnv(codeDir));
+    }
 
     runLog.append(
       'meta',
@@ -2856,12 +2860,38 @@ function detectPrimaryLanguage(codeDir: string): string | null {
 }
 
 /**
+ * 从工作区路径还原项目 ID。
+ * GitHub / 解压后常见路径是 workspace/<projectId>/<repoName>，不能只用 basename
+ *（否则会当成仓库名去查库，丢掉 audit_language，覆盖闸误报「无法确定语言」）。
+ */
+export function projectIdFromCodeDir(codeDir: string): string | null {
+  const resolved = path.resolve(codeDir);
+  const wsRoot = path.resolve(WORKSPACE_DIR);
+  if (resolved === wsRoot || resolved.startsWith(wsRoot + path.sep)) {
+    const top = path.relative(wsRoot, resolved).split(path.sep).filter(Boolean)[0];
+    if (top && getProject(top)) return top;
+  }
+  const base = path.basename(resolved);
+  if (getProject(base)) return base;
+  const rows = db
+    .prepare('SELECT id, workspace_path FROM projects WHERE workspace_path IS NOT NULL')
+    .all() as { id: string; workspace_path: string }[];
+  for (const row of rows) {
+    const wp = path.resolve(row.workspace_path);
+    if (resolved === wp || resolved.startsWith(wp + path.sep) || wp.startsWith(resolved + path.sep)) {
+      return row.id;
+    }
+  }
+  return null;
+}
+
+/**
  * 期望的子智能体清单：导入时用户指定语言的专项（路数随语言特性而定）。
  * 无项目语言时回退到工作区构建文件探测；仍无法识别或清单为空则返回 null（覆盖闸 fail-closed）。
  */
-export function expectedSubagents(codeDir: string): string[] | null {
-  const projectId = path.basename(path.resolve(codeDir));
-  const project = getProject(projectId);
+export function expectedSubagents(codeDir: string, projectIdHint?: string): string[] | null {
+  const projectId = projectIdHint || projectIdFromCodeDir(codeDir);
+  const project = projectId ? getProject(projectId) : undefined;
   const fromProject = String(project?.audit_language || '').trim();
   const lang = isAuditLanguage(fromProject) ? fromProject : detectPrimaryLanguage(codeDir);
   if (!lang || !isAuditLanguage(lang)) return null;
@@ -2906,9 +2936,9 @@ export function auditCoverageFailureReason(coverage: AuditCoverageSnapshot): str
 /** DB 批量审计、运行时补跑、最终完成闸共用的唯一覆盖判定。 */
 export function auditCoverageSnapshot(
   codeDir: string,
-  options: { repair?: boolean } = {}
+  options: { repair?: boolean; projectId?: string } = {}
 ): AuditCoverageSnapshot {
-  const expected = expectedSubagents(codeDir);
+  const expected = expectedSubagents(codeDir, options.projectId);
   if (!expected || expected.length === 0) {
     return {
       status: 'unknown_language',
@@ -2969,7 +2999,7 @@ function assertAuditCoverageComplete(
   codeDir: string,
   options: { recordSuccess?: boolean } = {}
 ): boolean {
-  const coverage = auditCoverageSnapshot(codeDir, { repair: true });
+  const coverage = auditCoverageSnapshot(codeDir, { repair: true, projectId });
   if (coverage.relinked.length > 0 || coverage.normalized.length > 0) {
     recordEvent(projectId, {
       kind: 'system',
@@ -3005,7 +3035,7 @@ function assertAuditCoverageComplete(
  */
 async function ensureSubagentCoverage(projectId: string, codeDir: string): Promise<{ killed: boolean }> {
   if (!subagentCoverageGuardOn()) return { killed: false };
-  const initialExpected = expectedSubagents(codeDir);
+  const initialExpected = expectedSubagents(codeDir, projectId);
   if (!initialExpected) return { killed: false }; // 语言未知：不盲目补跑，交由原有兜底逻辑
   let expected: string[] = initialExpected;
   const jsonDir = path.join(codeDir, 'JSON');
@@ -3013,7 +3043,7 @@ async function ensureSubagentCoverage(projectId: string, codeDir: string): Promi
     // 补跑会写入审计中间文件，语言体量的判定结果可能随之变化。
     // 每轮重新计算期望清单，确保新增的次要语言专项也会在本轮补齐，
     // 而不是第一轮按旧清单完成后被最终硬闸突然判失败。
-    const refreshedExpected = expectedSubagents(codeDir);
+    const refreshedExpected = expectedSubagents(codeDir, projectId);
     if (refreshedExpected) expected = refreshedExpected;
     const repair = reconcileSubagentArtifacts(codeDir, expected);
     if (repair.relinked.length > 0 || repair.normalized.length > 0) {
@@ -3149,8 +3179,8 @@ async function ensureCoverageDepth(_projectId: string, _codeDir: string): Promis
 }
 
 /** 子智能体 JSON 是否已全部落盘（与 ensureSubagentCoverage 判定一致）。 */
-function isSubagentPhaseComplete(codeDir: string): boolean {
-  return auditCoverageSnapshot(codeDir, { repair: true }).status === 'complete';
+function isSubagentPhaseComplete(codeDir: string, projectId?: string): boolean {
+  return auditCoverageSnapshot(codeDir, { repair: true, projectId }).status === 'complete';
 }
 
 type MainAuditStageResult = {
@@ -3196,8 +3226,8 @@ async function runAuditPostSubagentPhase(
 }
 
 /**
- * 多智能体审计：1 路主控分配方向 + N 路专项并发挖洞（共 N+1 个 Pi）。
- * 专项路数随语言而定（最多 4），主控不占用漏洞方向名额。
+ * 多智能体审计：N 路专项并发挖洞。收口由后端 Promise.all + 覆盖核对完成，不再另拉主控 Pi
+ *（旧主控会 sleep 轮询 JSON，把页面卡在「仍无产出，继续等待」）。
  */
 async function runSpecialtyAgents(
   projectId: string,
@@ -3315,13 +3345,13 @@ async function doAudit(projectId: string): Promise<void> {
     kind: 'system',
     agent: '主控',
     tool: '',
-    text: `▶ 多智能体审计（${langLabel}）：1 路主控分配方向 + ${subagentsForLanguage(lang).length} 路专项并发（共 ${subagentsForLanguage(lang).length + 1} 个 Pi）`,
+    text: `▶ 多智能体审计（${langLabel}）：${subagentsForLanguage(lang).length} 路专项并发（后端收口，不另拉主控轮询）`,
   });
 
   const agents = subagentsForLanguage(lang);
   const r = await runSpecialtyAgents(projectId, codeDir, agents, JSON.stringify(VULN_SCHEMA), {
     language: lang,
-    orchestrator: true,
+    orchestrator: false,
   });
   if (r.killed) return;
 
@@ -3604,7 +3634,7 @@ async function doReprocess(projectId: string, continueMode = false): Promise<voi
     return;
   }
   if (continueMode) {
-    const phaseComplete = isSubagentPhaseComplete(codeDir);
+    const phaseComplete = isSubagentPhaseComplete(codeDir, projectId);
     const hasAny = hasSubagentArtifacts(codeDir);
     recordEvent(projectId, {
       kind: 'system',
@@ -3637,7 +3667,7 @@ function finishAudit(projectId: string, status: string, error: string | null): v
     const project = getProject(projectId);
     const artifactRoot = resolveArtifactRoot(projectId, project?.workspace_path);
     const coverage = artifactRoot
-      ? auditCoverageSnapshot(artifactRoot, { repair: true })
+      ? auditCoverageSnapshot(artifactRoot, { repair: true, projectId })
       : ({
           status: 'unknown_language',
           expected: [],
@@ -10232,7 +10262,7 @@ function hasProvableCurrentAuditCoverage(projectId: string): boolean {
     .filter((candidate): candidate is string => !!candidate)
     .find((candidate) => fs.existsSync(candidate));
   if (!codeDir) return false;
-  return auditCoverageSnapshot(codeDir, { repair: false }).status === 'complete';
+  return auditCoverageSnapshot(codeDir, { repair: false, projectId }).status === 'complete';
 }
 
 /**

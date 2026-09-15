@@ -16,7 +16,7 @@
 
 ## 架构
 
-控制台调度审计与验证。全量审计是 1 路主控 + 每语言 4 路专项 Pi；去重、代码级验证、红队二次评级共用工人池（每路 10 条、最多 10 路）。走完这四关后，在 Compose 完整 HTTP 靶机上打单洞、拼组合链。验证可以和审计并行预搭建靶机，但不走最小运行时。
+控制台调度审计与验证。全量审计是每语言 4 路专项 Pi 并发，由后端收口（不再另拉主控轮询）；去重、代码级验证、红队二次评级共用工人池（每路 10 条、最多 10 路）。走完这四关后，在 Compose 完整 HTTP 靶机上打单洞、拼组合链。验证可以和审计并行预搭建靶机，但不走最小运行时。
 
 ![StrikeAgent_Coder-Flash 架构](docs/assets/architecture.png)
 
@@ -49,12 +49,13 @@
 把下面整段连同源代码交给任意能跑本机命令的 AI。它应按原文把控制台搭起来，不要把路径写死成别人的机器。
 
 ```
-你要在本机把 StrikeAgent_Coder-Flash 从当前源代码部署到可打开的代码审计控制台。目标系统是 Kali / Debian 系 Linux（有 Node、能装全局 npm 包、能跑 Docker）。不要用 Docker 当本控制台的主路径（控制台是 Node 前后端；Docker 只给「远程验证」拉靶机用）。不要把任何路径写死成 /home/kali/桌面/... 或其它克隆者机器上的目录。
+你要在本机把 StrikeAgent_Coder-Flash 从当前源代码部署到可打开的代码审计控制台。目标系统是 Kali / Debian 系 Linux（有 Node、能装全局 npm 包、能跑 Docker、有 systemd 可 sudo）。不要用 Docker 当本控制台的主路径（控制台是 Node 前后端；Docker 只给「远程验证」拉靶机用）。不要把任何路径写死成 /home/kali/桌面/... 或其它克隆者机器上的目录。
 
 一、目录与进程纪律
 - 仓库根记为 REPO（含 backend/、frontend/、docs/、根 package.json 的 npm workspaces）。
-- 开发：后端 :8787，前端 :5302（Vite 把 /api 和 /ws 代理到 8787）。局域网要打开时 BIND_HOST=0.0.0.0。
-- 生产：npm run start:web 先构建 frontend/dist，再由后端同端口 8787 托管 SPA。不要同时再起一份 npm run dev，会抢 8787。
+- 控制台默认：后端 :8787，前端 :5302（Vite 把 /api 和 /ws 代理到 8787）。局域网要打开时 BIND_HOST=0.0.0.0。
+- 长期部署必须走守护，不要用前台 npm run dev：终端一关或后端卡死就不会回来；tsx watch 改源码还会掐断审计。
+- 生产单端口：npm run start:web 先构建 frontend/dist，再由后端（supervisor）同端口 8787 托管 SPA。不要同时再起一份 Vite。
 - 数据、库、工作区、上传只写 backend/data/、backend/workspace/、backend/uploads/（已 gitignore）。不要提交 .env、*.db、workspace、data。
 - 8787 已被占用 = 已有后端在跑。不要再起第二个后端，否则会双开 Pi、把同一项目跑乱。先 curl 探活，活着就复用。
 
@@ -62,22 +63,27 @@
 - Node.js 18+、npm。系统包：sudo apt 安装 nodejs npm build-essential python3 curl git docker.io docker-compose-plugin（或 docker-compose）。当前用户要进 docker 组，docker ps 能跑，远程验证才能拉 Compose 完整 HTTP 靶机。
 - 在 REPO 执行：npm run install:all（会 rebuild backend 的 better-sqlite3）。不要只装 frontend 或只装 backend。
 - 全局安装 Pi：npm install -g --ignore-scripts @earendil-works/pi-coding-agent。本机 `pi --version` 必须能跑。
-- 密钥给 Pi 用，不要写进仓库。需要 DEEPSEEK_API_KEY，或 ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY（也可配在 ~/.pi/agent/settings.json 的 env）。设置页里「Pi 可执行文件」对应库键 claude_path，空则自动解析全局 pi。
+- 密钥给 Pi 用，不要写进仓库。需要 DEEPSEEK_API_KEY，或 ANTHROPIC_AUTH_TOKEN / ANTHROPIC_API_KEY（也可配在 ~/.pi/agent/settings.json 的 env）。设置页里「Pi 可执行文件」对应库键 claude_path，空则自动解析全局 pi。把当前 shell 里的 DEEPSEEK_* / ANTHROPIC_* / PI_* 准备好后再 sudo scripts/code-up.sh（会快照到 backend/data/code-agent.env，权限 600）。
 - 默认审计命令形态是：pi --mode json --no-session --no-context-files --provider anthropic {prompt}。不要改回 claude CLI，Flash 版引擎是 Pi。
 
-三、启动
-- 开发（推荐，前后端热重载）：
+三、启动（常驻，推荐）
+- 有 systemd（默认）：把密钥 export 好后执行
+  cd $REPO && sudo bash scripts/code-up.sh
+  这会安装 code-flash-backend / code-flash-frontend 两个 unit：后端走 supervisor.mjs（/api/health 连续失败约数秒内 SIGKILL 并拉起；unit 自身 Restart=always），前端 Vite 崩溃也会自动重启。
+- 无 systemd / 不能 sudo：
+  cd $REPO && BIND_HOST=0.0.0.0 bash scripts/code-daemon.sh start
+- 仅改代码调试（会热重载、关终端即停，不要当部署）：
   cd $REPO && BIND_HOST=0.0.0.0 PORT=8787 BACKEND_PORT=8787 FRONTEND_PORT=5302 npm run dev
-- 生产：
+- 生产单端口：
   cd $REPO && BIND_HOST=0.0.0.0 PORT=8787 npm run start:web
-- 不要在临时 shell 里再起一份 npm --workspace backend run dev / tsx src/index.ts，会和已有后端抢端口、重复派 Pi。
+- 不要在临时 shell 里再起 npm --workspace backend run dev / tsx src/index.ts，会和守护抢端口、重复派 Pi。
 
 四、验收
 curl -sS http://127.0.0.1:8787/api/health          期望 {"ok":true,...}
 curl -sS http://127.0.0.1:8787/api/pi/health       期望能解析到本机 pi（未装 Pi 会提示 npm install -g --ignore-scripts @earendil-works/pi-coding-agent）
-开发模式再打开：http://127.0.0.1:5302/   （局域网用本机 IP:5302，不要用 127.0.0.1 从另一台机器访问）
-生产模式打开：http://127.0.0.1:8787/
-失败先看跑 npm run dev 的终端：缺 native 模块则在 REPO 再 npm run install:all；8787 占用则不要再起后端；pi 找不到就按上面全局安装并确认密钥。
+常驻 / 开发：http://127.0.0.1:5302/   （局域网用本机 IP:5302）
+生产单端口：http://127.0.0.1:8787/
+失败先看：sudo scripts/code-backend.sh status / sudo journalctl -u code-flash-backend -n 80；或 backend/data/logs/ 与 backend/data/supervisor.log。缺 native 模块则在 REPO 再 npm run install:all；8787 占用则不要再起后端；pi 找不到就按上面全局安装并确认密钥。
 ```
 
 
@@ -89,7 +95,7 @@ curl -sS http://127.0.0.1:8787/api/pi/health       期望能解析到本机 pi�
 
 | 依赖            | 版本 / 说明                                                                                      |
 | ------------- | -------------------------------------------------------------------------------------------- |
-| 系统            | Kali / Debian 系，能 `sudo`                                                                     |
+| 系统            | Kali / Debian 系，systemd，能 `sudo`（长期部署走 `scripts/code-up.sh`）                            |
 | Node.js / npm | **18+**                                                                                      |
 | Pi            | 本机 `pi` 能用：`npm i -g --ignore-scripts @earendil-works/pi-coding-agent`，配好 `DEEPSEEK_API_KEY` |
 | Docker        | 当前用户能 `docker ps`；远程验证拉 Compose 完整 HTTP 靶机                                                   |
@@ -132,15 +138,24 @@ cd StrikeAgent-Coder-Flash
 npm run install:all
 ```
 
-开发（推荐）：
+长期部署（推荐，崩溃 / 卡死会自动拉起）：
+
+```bash
+# 先 export DEEPSEEK_API_KEY=... 等密钥
+sudo bash scripts/code-up.sh
+```
+
+浏览器打开 **[http://127.0.0.1:5302/](http://127.0.0.1:5302/)**。局域网其它机器用 `http://<kali-ip>:5302/`。
+
+无 systemd 时：`bash scripts/code-daemon.sh start`。
+
+仅本地改代码调试（关终端即停）：
 
 ```bash
 BIND_HOST=0.0.0.0 PORT=8787 BACKEND_PORT=8787 FRONTEND_PORT=5302 npm run dev
 ```
 
-浏览器打开 **[http://127.0.0.1:5302/](http://127.0.0.1:5302/)**。局域网其它机器用 `http://<kali-ip>:5302/`。
-
-生产：
+生产单端口（supervisor 托管 SPA）：
 
 ```bash
 BIND_HOST=0.0.0.0 PORT=8787 npm run start:web
@@ -153,6 +168,8 @@ BIND_HOST=0.0.0.0 PORT=8787 npm run start:web
 ```bash
 curl -sS http://127.0.0.1:8787/api/health
 # 期望含 "ok": true
+
+sudo bash scripts/code-backend.sh status
 
 curl -sS http://127.0.0.1:8787/api/pi/health
 # 期望能解析到本机 pi
