@@ -179,9 +179,14 @@ curl -sS http://127.0.0.1:8787/api/pi/health
 
 ## 开源协议与免责声明
 
-本仓库按 [GNU Affero General Public License v3.0](LICENSE) 开源（AGPL-3.0）。
+**AGPL-3.0-only** — 个人和开源使用免费。商业许可请联系 [gavenmiya@outlook.com](mailto:gavenmiya@outlook.com)。
 
-你可以复制、修改、分发本软件（包括收费），但必须保留版权与许可证声明；修改版若通过网络提供服务，必须向用户提供完整对应源代码，并以 AGPL-3.0 再许可。详见 [LICENSE](LICENSE)。
+本仓库默认按 [GNU Affero General Public License v3.0](LICENSE)（仅第 3 版，不含后续版本）开源：
+
+- **个人 / 开源（免费）：** 可复制、修改、分发；通过网络提供服务时，必须向用户提供完整对应源代码，并以 AGPL-3.0-only 再许可。
+- **商业许可：** 闭源修改、专有产品、SaaS，或无法 / 不愿履行 AGPL 源代码义务的部署，须向夜安团队 SEC 取得单独商业许可。联系：**gavenmiya@outlook.com**
+
+AGPL 正文见 [LICENSE](LICENSE)。商业许可条款以邮件约定为准。
 
 本软件仅限在已获明确授权的环境中使用。使用即表示你已获得目标环境的授权，并自行承担合规与后果。作者与夜安团队 SEC 不对滥用、数据损坏或法律纠纷负责。
 
